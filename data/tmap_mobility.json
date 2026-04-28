@@ -1,0 +1,55 @@
+{
+  "company_name": "티맵모빌리티",
+  "company_name_en": "TMap Mobility",
+  "sector": "모빌리티 플랫폼",
+  "listing_status": "비상장",
+  "fiscal_year_end": "12월",
+  "currency": "KRW",
+  "unit": "억원",
+  "standard": "K-IFRS 연결",
+  "source": "DART 연결감사보고서",
+  "dart_links": {
+    "2025": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260403002422",
+    "2024": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20250404002498",
+    "2023": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240409001752"
+  },
+  "years": ["2022", "2023", "2024", "2025"],
+  "income_statement": {
+    "revenue":          [2046, 2871, 3226, 2835],
+    "operating_cost":   [3024, 3660, 3659, 2976],
+    "operating_income": [-978, -789, -434, -141],
+    "non_operating":    [-671,   49, -182,  464],
+    "ebt":             [-1649, -740, -616,  323],
+    "net_income":      [-1608, -423, -774,  250]
+  },
+  "cost_breakdown": {
+    "service_cost":     [1328, 1673, 1843, 1390],
+    "employee_cost":    [ 681,  773,  618,  499],
+    "commission_fee":   [ 645,  818,  817,  689],
+    "depreciation":     [ 206,  229,  214,  185],
+    "advertising":      [  88,   65,   70,  133]
+  },
+  "margins": {
+    "operating_margin": [-47.8, -27.5, -13.5, -5.0],
+    "net_margin":       [-78.6, -14.7, -24.0,  8.8]
+  },
+  "cagr": {
+    "period": "2022→2025",
+    "revenue":          11.5,
+    "operating_cost":   -0.5,
+    "employee_cost":    -9.9,
+    "depreciation":     -3.5,
+    "advertising":      14.8,
+    "net_income":       "흑자전환"
+  },
+  "yoy_growth": {
+    "revenue":          [null, 40.3, 12.4, -12.1]
+  },
+  "key_highlights": [
+    "2025년 당기순이익 흑자전환 (+250억)",
+    "영업손실 3년 연속 축소: (978)억 → (789)억 → (434)억 → (141)억",
+    "종업원급여 CAGR -9.9%로 비용 효율화 진행 중",
+    "2025년 매출 -12.1% 역성장 (사업 재편 영향)",
+    "영업손실률 개선: -47.8% → -5.0% (3년간)"
+  ]
+}
