@@ -34,27 +34,32 @@ html, body, [class*="css"], .stApp {
 
 [data-testid="stSidebar"] div[data-testid="stButton"] button {
     width: 100%;
-    background: rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.07) !important;
     color: #C8D8F0 !important;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px;
-    padding: 0.55rem 1rem;
-    font-size: 0.88rem;
-    font-weight: 400;
-    text-align: left;
-    transition: all 0.2s;
-    margin-bottom: 4px;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 8px !important;
+    padding: 0.55rem 1rem !important;
+    font-size: 0.88rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    transition: all 0.2s !important;
+    margin-bottom: 4px !important;
 }
 [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.18) !important;
     color: #FFFFFF !important;
-    border-color: rgba(255,255,255,0.35);
+    border-color: rgba(255,255,255,0.35) !important;
 }
 [data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
     background: rgba(82,160,255,0.25) !important;
     color: #FFFFFF !important;
     border: 1px solid rgba(82,160,255,0.6) !important;
     font-weight: 600 !important;
+}
+[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {
+    background: rgba(255,255,255,0.07) !important;
+    color: #C8D8F0 !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
 }
 
 .main .block-container { padding: 1.5rem 2rem 2rem 2rem; max-width: 100%; }
