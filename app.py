@@ -386,7 +386,7 @@ def render_company(data):
                 return "color: #C0392B; font-weight:500" if v < 0 else "color: #1A7F4B; font-weight:500"
             return ""
 
-        df_styled = df.style.applymap(style_df).format("{:,.1f}")
+        df_styled = df.style.map(style_df).format("{:,.1f}")
         st.dataframe(df_styled, use_container_width=True)
 
         st.markdown("<div class='section-title'>CAGR 요약</div>", unsafe_allow_html=True)
