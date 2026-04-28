@@ -1,0 +1,54 @@
+{
+  "company_name": "십일번가",
+  "company_name_en": "Eleven Street",
+  "sector": "이커머스 플랫폼",
+  "listing_status": "비상장",
+  "fiscal_year_end": "12월",
+  "currency": "KRW",
+  "unit": "억원",
+  "standard": "K-GAAP 개별",
+  "source": "DART 감사보고서",
+  "dart_links": {
+    "2025": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260408003300",
+    "2024": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20250408003313",
+    "2023": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20240329000064"
+  },
+  "years": ["2022", "2023", "2024", "2025"],
+  "income_statement": {
+    "revenue":          [7890, 8655, 5618, 4376],
+    "operating_cost":   [9405, 9913, 6372, 4772],
+    "operating_income": [-1515, -1258, -754, -396],
+    "non_operating":    [60, 66, -95, 165],
+    "ebt":              [-1455, -1195, -846, -231],
+    "net_income":       [-1038, -1313, -933, -507]
+  },
+  "cost_breakdown": {
+    "service_cost":     [2890, 4138, 1815, 1011],
+    "employee_cost":    [1153, 1088, 841, 752],
+    "commission_fee":   [3375, 2821, 2042, 1788],
+    "depreciation":     [271, 326, 339, 250],
+    "advertising":      [1263, 1100, 826, 662]
+  },
+  "margins": {
+    "operating_margin": [-19.2, -14.5, -13.4, -9.1],
+    "net_margin":       [-13.2, -15.2, -16.6, -11.6]
+  },
+  "cagr": {
+    "period": "2022→2025",
+    "revenue":          -17.8,
+    "operating_cost":   -19.8,
+    "employee_cost":    -13.3,
+    "depreciation":     -2.6,
+    "advertising":      -19.4
+  },
+  "yoy_growth": {
+    "revenue": [null, 9.7, -35.1, -22.1]
+  },
+  "key_highlights": [
+    "2024~2025년 매출 급감: 아마존 파트너십 종료 및 사업 구조조정 영향",
+    "영업손실 3년 연속 축소: (1,515)억 → (1,258)억 → (754)억 → (396)억",
+    "2025년 영업손실률 -9.1%로 개선, 비용 효율화 지속",
+    "상품및기타구입비용 CAGR -30.1% — 직매입 사업 대폭 축소",
+    "지급수수료 감소에도 영업비용 구조 개선 중"
+  ]
+}
