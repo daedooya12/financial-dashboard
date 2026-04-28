@@ -227,7 +227,7 @@ def make_revenue_chart(data):
             zerolinecolor="#CCCCCC",
             zerolinewidth=1,
         ),
-        xaxis=dict(tickfont=dict(size=12)),
+        xaxis=dict(tickfont=dict(size=12), type="category"),
         font=dict(family="Noto Sans KR"),
         showlegend=True,
     )
@@ -270,6 +270,7 @@ def make_margin_chart(data):
                     font=dict(size=12, family="Noto Sans KR")),
         yaxis=dict(ticksuffix="%", gridcolor="#F0F0F0", zeroline=True,
                    zerolinecolor="#CCCCCC", zerolinewidth=1),
+        xaxis=dict(type="category"),
         font=dict(family="Noto Sans KR"),
     )
     return fig
@@ -296,6 +297,7 @@ def make_cost_chart(data):
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
                     font=dict(size=11, family="Noto Sans KR")),
         yaxis=dict(tickformat=",", ticksuffix="억", gridcolor="#F0F0F0"),
+        xaxis=dict(type="category"),
         font=dict(family="Noto Sans KR"),
     )
     return fig
@@ -352,8 +354,8 @@ def render_company(data):
 
     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
-    # 탭
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 수익 추이", "📉 이익률 추이", "🗂 비용 구조", "📋 상세 수치"])
+    # ── 상단: 차트 탭 (Summary) ──────────────────────────────
+    tab1, tab2, tab3 = st.tabs(["📈 수익 추이", "📉 이익률 추이", "🗂 비용 구조"])
 
     with tab1:
         st.plotly_chart(make_revenue_chart(data), use_container_width=True)
@@ -365,52 +367,52 @@ def render_company(data):
     with tab3:
         st.plotly_chart(make_cost_chart(data), use_container_width=True)
 
-    with tab4:
-        # 상세 테이블
-        st.markdown("<div class='section-title'>손익계산서 요약</div>", unsafe_allow_html=True)
-        rows = {
-            "영업수익": inc["revenue"],
-            "영업비용": inc["operating_cost"],
-            "영업손익": inc["operating_income"],
-            "영업손실률(%)": data["margins"]["operating_margin"],
-            "영업외손익": inc["non_operating"],
-            "법인세차감전손익": inc["ebt"],
-            "당기순이익(손실)": inc["net_income"],
-            "순이익률(%)": data["margins"]["net_margin"],
-        }
-        df = pd.DataFrame(rows, index=years).T
-        df.index.name = "항목"
-
-        def style_df(v):
-            if isinstance(v, (int, float)):
-                return "color: #C0392B; font-weight:500" if v < 0 else "color: #1A7F4B; font-weight:500"
-            return ""
-
-        df_styled = df.style.map(style_df).format("{:,.1f}")
-        st.dataframe(df_styled, use_container_width=True)
-
-        st.markdown("<div class='section-title'>CAGR 요약</div>", unsafe_allow_html=True)
-        cagr = data["cagr"]
-        cagr_rows = []
-        skip = {"period", "net_income"}
-        labels_map = {
-            "revenue": "영업수익",
-            "operating_cost": "영업비용",
-            "employee_cost": "종업원급여",
-            "depreciation": "감가상각비",
-            "advertising": "광고선전비",
-        }
-        for k, v in cagr.items():
-            if k in skip or k == "period":
-                continue
-            label = labels_map.get(k, k)
-            cagr_rows.append({"항목": label, f"CAGR ({cagr['period']})": f"{v:+.1f}%" if isinstance(v, (int, float)) else v})
-        st.dataframe(pd.DataFrame(cagr_rows).set_index("항목"), use_container_width=True)
-
-    # 하이라이트
+    # ── 주요 시사점 ──────────────────────────────────────────
     st.markdown("<div class='section-title'>주요 시사점</div>", unsafe_allow_html=True)
     for hl in data.get("key_highlights", []):
         st.markdown(f"<div class='highlight-box'>• {hl}</div>", unsafe_allow_html=True)
+
+    # ── 하단: 상세 테이블 (항상 표시) ───────────────────────
+    st.markdown("<div class='section-title'>손익계산서 상세</div>", unsafe_allow_html=True)
+
+    rows = {
+        "영업수익": inc["revenue"],
+        "영업비용": inc["operating_cost"],
+        "영업손익": inc["operating_income"],
+        "영업손실률(%)": data["margins"]["operating_margin"],
+        "영업외손익": inc["non_operating"],
+        "법인세차감전손익": inc["ebt"],
+        "당기순이익(손실)": inc["net_income"],
+        "순이익률(%)": data["margins"]["net_margin"],
+    }
+    df = pd.DataFrame(rows, index=years).T
+    df.index.name = "항목"
+
+    def style_df(v):
+        if isinstance(v, (int, float)):
+            return "color: #C0392B; font-weight:500" if v < 0 else "color: #1A7F4B; font-weight:500"
+        return ""
+
+    df_styled = df.style.map(style_df).format("{:,.1f}")
+    st.dataframe(df_styled, use_container_width=True)
+
+    # CAGR 테이블
+    st.markdown("<div class='section-title'>CAGR 요약</div>", unsafe_allow_html=True)
+    cagr = data["cagr"]
+    cagr_rows = []
+    labels_map = {
+        "revenue": "영업수익",
+        "operating_cost": "영업비용",
+        "employee_cost": "종업원급여",
+        "depreciation": "감가상각비",
+        "advertising": "광고선전비",
+    }
+    for k, v in cagr.items():
+        if k == "period":
+            continue
+        label = labels_map.get(k, k)
+        cagr_rows.append({"항목": label, f"CAGR ({cagr['period']})": f"{v:+.1f}%" if isinstance(v, (int, float)) else v})
+    st.dataframe(pd.DataFrame(cagr_rows).set_index("항목"), use_container_width=True)
 
     st.markdown(f"<p class='source-note' style='margin-top:1rem;'>출처: {data['source']} | 단위: {data['unit']} | 기준: {data['standard']}</p>",
                 unsafe_allow_html=True)
