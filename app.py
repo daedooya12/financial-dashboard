@@ -46,16 +46,14 @@ html, body, [class*="css"], .stApp {
     margin-bottom: 4px !important;
 }
 [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-    background: rgba(255,255,255,0.18) !important;
+    background: rgba(255,255,255,0.22) !important;
     color: #FFFFFF !important;
-    border-color: rgba(255,255,255,0.35) !important;
+    border-color: rgba(255,255,255,0.4) !important;
 }
-[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
-    background: rgba(82,160,255,0.25) !important;
-    color: #FFFFFF !important;
-    border: 1px solid rgba(82,160,255,0.6) !important;
-    font-weight: 600 !important;
+[data-testid="stSidebar"] div[data-testid="stButton"] button p {
+    color: inherit !important;
 }
+[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"],
 [data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"] {
     background: rgba(255,255,255,0.07) !important;
     color: #C8D8F0 !important;
@@ -359,7 +357,7 @@ def render_sidebar(companies):
         for key, comp in companies.items():
             is_active = st.session_state.selected == key
             label = ("▶  " if is_active else "    ") + comp["company_name"]
-            if st.button(label, key=f"btn_{key}", type="primary" if is_active else "secondary"):
+            if st.button(label, key=f"btn_{key}", use_container_width=True):
                 st.session_state.selected = key
                 st.rerun()
 
