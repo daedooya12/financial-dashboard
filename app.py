@@ -137,6 +137,79 @@ def fetch_fs_raw(api_key, corp_code, year, reprt_code, fs_div):
     except:
         return []
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_audit_report_list(api_key, corp_code, year):
+    """감사보고서 목록 조회 (비상장사용) - A001=감사보고서"""
+    try:
+        r = requests.get(f"{DART_BASE}/list.json", params={
+            "crtfc_key": api_key, "corp_code": corp_code,
+            "bgn_de": str(year) + "0101", "end_de": str(year+1) + "0630",
+            "pblntf_ty": "A", "page_count": "10"
+        }, timeout=15)
+        d = r.json()
+        if d.get("status") == "000":
+            return d.get("list", [])
+    except:
+        pass
+    return []
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_xbrl_fs(api_key, rcp_no, fs_div):
+    """감사보고서 rcpNo로 XBRL 재무제표 조회"""
+    try:
+        r = requests.get(f"{DART_BASE}/fnlttXbrlAll.json", params={
+            "crtfc_key": api_key, "rcpNo": rcp_no, "reprt_code": "11011"
+        }, timeout=30)
+        d = r.json()
+        if d.get("status") == "000":
+            return d.get("list", [])
+    except:
+        pass
+    return []
+
+def fetch_fs_auto(api_key, corp_code, year, fs_div):
+    """
+    1순위: fnlttSinglAcntAll (상장사/사업보고서 법인)
+    2순위: 감사보고서 목록 → fnlttXbrlAll (비상장사)
+    3순위: fs_div 반전 재시도
+    """
+    # 1순위: 사업보고서 기반
+    reprt_codes = ["11011", "11012", "11013", "11014"]
+    fs_divs = [fs_div, "OFS" if fs_div == "CFS" else "CFS"]
+    for rc in reprt_codes:
+        for fd in fs_divs:
+            data = fetch_fs_raw(api_key, corp_code, year, rc, fd)
+            if data:
+                return data, "fnlttSinglAcntAll/" + rc, fd
+
+    # 2순위: 감사보고서 목록 기반 (비상장사)
+    audit_list = fetch_audit_report_list(api_key, corp_code, year)
+    for report in audit_list:
+        rcp_no = report.get("rcept_no", "")
+        if not rcp_no: continue
+        for fd in fs_divs:
+            data = fetch_xbrl_fs(api_key, rcp_no, fd)
+            if data:
+                return data, "fnlttXbrlAll/" + rcp_no, fd
+
+    return [], None, None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_corp_code_by_name(api_key, corp_name):
+    """회사명으로 정확한 corp_code 조회 (DART 기업검색 API)"""
+    try:
+        r = requests.get(f"{DART_BASE}/company.json", params={
+            "crtfc_key": api_key, "corp_name": corp_name
+        }, timeout=15)
+        d = r.json()
+        if d.get("status") == "000":
+            items = d.get("list", [])
+            if items:
+                return items[0].get("corp_code")
+    except:
+        pass
+    return None
+
 # ── 파싱 유틸 ─────────────────────────────────────────────────
 def parse_amount(s):
     if not s or str(s).strip() in ("", "-", "－", "N/A"): return None
@@ -485,34 +558,41 @@ def render_main(api_key):
         prog = st.progress(0, text=corp_name + " 데이터 로딩 중...")
         for i, yr in enumerate(years):
             prog.progress((i+1)/len(years), text=str(yr) + "년 조회 중...")
-            raw = fetch_fs_raw(api_key, corp_code, yr, "11011", fs_div)
-            # 연결 없으면 개별로 fallback
-            if not raw and fs_div == "CFS":
-                raw = fetch_fs_raw(api_key, corp_code, yr, "11011", "OFS")
+            raw, used_rc, used_fd = fetch_fs_auto(api_key, corp_code, yr, fs_div)
             pl = get_pl_items(raw)
             bs = get_bs_items(raw)
             cf = get_cf_items(raw)
             dep = get_dep_from_cf(cf)
-            years_data[yr] = {"pl": pl, "bs": bs, "cf": cf, "dep": dep, "raw": raw}
+            years_data[yr] = {"pl": pl, "bs": bs, "cf": cf, "dep": dep, "raw": raw,
+                               "reprt_code": used_rc, "fs_div_used": used_fd}
         prog.empty()
         fs_cache[cache_key] = years_data
         st.session_state.fs_cache = fs_cache
     else:
         years_data = fs_cache[cache_key]
 
-    # ── 디버그 패널 (sj_nm 확인용) ──
-    with st.expander("🔧 DEBUG: DART API 응답 확인 (문제 진단용)", expanded=False):
-        sample_yr = years[-1]
-        raw_sample = years_data.get(sample_yr, {}).get("raw", [])
-        if raw_sample:
-            sj_nms = sorted(set(item.get("sj_nm","") for item in raw_sample))
-            st.markdown("**sj_nm 목록 (" + str(sample_yr) + "년):**")
-            for s in sj_nms:
-                st.code(repr(s))
-            st.markdown("**전체 응답 샘플 (처음 5개):**")
-            st.json(raw_sample[:5])
-        else:
-            st.warning("API 응답 없음 — corp_code 또는 연도 확인 필요")
+    # ── 디버그 패널 ──
+    with st.expander("🔧 DEBUG: DART API 응답 확인", expanded=False):
+        st.markdown("**corp_code:** `" + corp_code + "` | **fs_div:** `" + fs_div + "`")
+        for yr in years:
+            yd = years_data.get(yr, {})
+            raw_s = yd.get("raw", [])
+            rc    = yd.get("reprt_code", "—")
+            fd    = yd.get("fs_div_used", "—")
+            sj_nms = sorted(set(item.get("sj_nm","") for item in raw_s)) if raw_s else []
+            status = "✅ " + str(len(raw_s)) + "건 (reprt:" + str(rc) + ", div:" + str(fd) + ")" if raw_s else "❌ 없음"
+            st.markdown("**" + str(yr) + "년:** " + status)
+            if sj_nms:
+                st.markdown("sj_nm: " + " | ".join([repr(s) for s in sj_nms]))
+        
+        # corp_code 수동 입력
+        st.markdown("---")
+        st.markdown("**corp_code 수동 입력 (검색 결과가 틀린 경우):**")
+        manual_code = st.text_input("8자리 corp_code", value=corp_code, key="manual_corp_code")
+        if st.button("이 corp_code로 재조회", key="manual_search"):
+            st.session_state.search_params["corp_code"] = manual_code
+            st.session_state.fs_cache = {}
+            st.rerun()
 
     # ── KPI 추출 ──
     kpis = {}
