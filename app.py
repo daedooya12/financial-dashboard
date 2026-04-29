@@ -181,7 +181,8 @@ def api_key():
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_corps(key):
     try:
-        r    = requests.get(f"{DART}/corpCode.xml", params={"crtfc_key": key}, timeout=30)
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        r    = requests.get(f"{DART}/corpCode.xml", params={"crtfc_key": key}, timeout=30, headers=headers)
         z    = zipfile.ZipFile(io.BytesIO(r.content))
         root = ET.fromstring(z.read("CORPCODE.xml"))
         out  = {}
@@ -190,8 +191,12 @@ def load_corps(key):
             c = (item.findtext("corp_code") or "").strip()
             s = (item.findtext("stock_code") or "").strip()
             if n and c: out[n] = {"corp_code": c, "stock_code": s}
+        print(f"DEBUG: load_corps success, loaded {len(out)} companies.")
         return out
-    except:
+    except Exception as e:
+        import traceback
+        print("DEBUG: load_corps exception:", e)
+        traceback.print_exc()
         return {}
 
 # ══ DART 기업정보 / 주주 / 뉴스 ══════════════
@@ -371,10 +376,12 @@ def build_perf_summary(kmap, years, name):
 
 def corp_search(corps, q):
     q = q.strip().upper()
+    q_clean = q.replace(" ", "")
     if not q: return []
     exact   = [(k, v) for k, v in corps.items() if k.upper() == q]
-    partial = [(k, v) for k, v in corps.items() if q in k.upper() and k.upper() != q]
-    return (exact + partial)[:10]
+    partial = [(k, v) for k, v in corps.items() if q_clean in k.upper().replace(" ", "") and k.upper() != q]
+    results = (exact + partial)[:10]
+    return results
 
 # ── 사업보고서 재무 조회 ──────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -763,16 +770,19 @@ def sidebar():
         selected = None
         if query and len(query.strip()) >= 1:
             corps   = load_corps(key)
-            results = corp_search(corps, query.strip())
-            if results:
-                labels = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
-                idx    = st.selectbox("", range(len(labels)),
-                                      format_func=lambda i: labels[i],
-                                      key="sel", label_visibility="collapsed")
-                selected = results[idx]
+            if not corps:
+                st.error("DART API에서 회사 목록을 불러오지 못했습니다. API 키가 유효한지 확인해주세요.")
             else:
-                st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
-                            unsafe_allow_html=True)
+                results = corp_search(corps, query.strip())
+                if results:
+                    labels = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
+                    idx    = st.selectbox("", range(len(labels)),
+                                          format_func=lambda i: labels[i],
+                                          key="sel", label_visibility="collapsed")
+                    selected = results[idx]
+                else:
+                    st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
+                                unsafe_allow_html=True)
 
         btn = st.button("📡 조회", use_container_width=True)
         if btn:
