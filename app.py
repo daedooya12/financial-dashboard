@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 st.set_page_config(
-    page_title="SK Square | 재무 분석",
+    page_title="상장법인 Dart 조회",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -77,6 +77,7 @@ html, body, [class*="css"], .stApp {
 .kpi-card.red    { border-top-color: #DC2626; }
 .kpi-card.teal   { border-top-color: #0D9488; }
 .kpi-card.amber  { border-top-color: #D97706; }
+.kpi-card.purple { border-top-color: #8B5CF6; }
 .kpi-card.gray   { border-top-color: #6B7280; }
 .kpi-label { font-size: .66rem; color: #9CA3AF; font-weight: 600;
              letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
@@ -185,9 +186,9 @@ def load_corps(key):
         root = ET.fromstring(z.read("CORPCODE.xml"))
         out  = {}
         for item in root.findall("list"):
-            n = item.findtext("corp_name", "").strip()
-            c = item.findtext("corp_code", "").strip()
-            s = item.findtext("stock_code", "").strip()
+            n = (item.findtext("corp_name") or "").strip()
+            c = (item.findtext("corp_code") or "").strip()
+            s = (item.findtext("stock_code") or "").strip()
             if n and c: out[n] = {"corp_code": c, "stock_code": s}
         return out
     except:
@@ -369,10 +370,10 @@ def build_perf_summary(kmap, years, name):
     return {"items": items, "issues": issues, "latest": latest, "prev": prev}
 
 def corp_search(corps, q):
-    q = q.strip()
+    q = q.strip().upper()
     if not q: return []
-    exact   = [(k, v) for k, v in corps.items() if k == q]
-    partial = [(k, v) for k, v in corps.items() if q in k and k != q]
+    exact   = [(k, v) for k, v in corps.items() if k.upper() == q]
+    partial = [(k, v) for k, v in corps.items() if q in k.upper() and k.upper() != q]
     return (exact + partial)[:10]
 
 # ── 사업보고서 재무 조회 ──────────────────────
@@ -698,7 +699,7 @@ def make_chart(kmap, years):
     fig = go.Figure()
     for name, vals, color in [
         ("매출",    rev, "#1A3A6B"),
-        ("EBITDA",  ebi, "#0D9488"),
+        ("EBITDA",  ebi, "#8B5CF6"),
     ]:
         fig.add_trace(go.Bar(name=name, x=yr, y=vals,
             marker_color=color, opacity=0.85, marker_line_width=0,
@@ -731,9 +732,9 @@ def sidebar():
         # 헤더
         st.markdown("""
         <div style='padding:1.3rem 0 .9rem;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:1rem;'>
-            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>SK SQUARE</div>
-            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>투자분석<br>재무 대시보드</div>
-            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>DART OpenAPI</div>
+            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>FINANCIAL DASHBOARD</div>
+            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>상장법인<br>Dart 조회</div>
+            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>DART OpenAPI 기반</div>
         </div>""", unsafe_allow_html=True)
 
         if not key:
@@ -837,7 +838,7 @@ def render(key):
         st.markdown("""
         <div class='empty-wrap'>
             <div style='font-size:2.5rem;margin-bottom:.8rem;'>📊</div>
-            <div style='font-size:1.1rem;font-weight:600;color:#374151;margin-bottom:.4rem;'>SK Square 재무 분석 대시보드</div>
+            <div style='font-size:1.1rem;font-weight:600;color:#374151;margin-bottom:.4rem;'>상장법인 Dart 조회 대시보드</div>
             <div style='font-size:.85rem;'>좌측에서 조회 방식을 선택하고 재무제표를 불러와 주세요</div>
             <div style='margin-top:1.5rem;background:#fff;border-radius:10px;padding:1rem 1.5rem;
                 display:inline-block;box-shadow:0 1px 6px rgba(0,0,0,.07);font-size:.82rem;color:#374151;'>
@@ -1090,7 +1091,7 @@ def render(key):
              sub=f"OPM {om:.1f}%" if om else None,
              color="green" if (ov and ov >= 0) else "red")
     r1 += kc(f"EBITDA {latest}",      ev, yoy_c(ev, ep),
-             sub=f"margin {em:.1f}%" if em else None, color="teal")
+             sub=f"margin {em:.1f}%" if em else None, color="purple")
     r1 += kc(f"세전이익 {latest}",    bv, yoy_c(bv, bp), color="amber")
     r1 += kc(f"당기순이익 {latest}",  nv, yoy_c(nv, np_),
              sub=f"NPM {nm_:.1f}%" if nm_ else None,
