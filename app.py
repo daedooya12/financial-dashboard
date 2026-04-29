@@ -500,6 +500,20 @@ def render_main(api_key):
     else:
         years_data = fs_cache[cache_key]
 
+    # ── 디버그 패널 (sj_nm 확인용) ──
+    with st.expander("🔧 DEBUG: DART API 응답 확인 (문제 진단용)", expanded=False):
+        sample_yr = years[-1]
+        raw_sample = years_data.get(sample_yr, {}).get("raw", [])
+        if raw_sample:
+            sj_nms = sorted(set(item.get("sj_nm","") for item in raw_sample))
+            st.markdown("**sj_nm 목록 (" + str(sample_yr) + "년):**")
+            for s in sj_nms:
+                st.code(repr(s))
+            st.markdown("**전체 응답 샘플 (처음 5개):**")
+            st.json(raw_sample[:5])
+        else:
+            st.warning("API 응답 없음 — corp_code 또는 연도 확인 필요")
+
     # ── KPI 추출 ──
     kpis = {}
     for yr in years:
