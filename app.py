@@ -1,9 +1,10 @@
 import streamlit as st
-import requests, os, io, zipfile, re
+import requests, os, io, zipfile, re, urllib.parse
 import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from datetime import datetime
 
 st.set_page_config(
     page_title="SK Square | 재무 분석",
@@ -129,6 +130,41 @@ html, body, [class*="css"], .stApp {
     font-size:.6rem; letter-spacing:.1em; color:#7B9EC4;
     font-weight:700; margin-bottom:5px; text-transform:uppercase;
 }
+
+/* 뉴스 */
+.news-item {
+    display:flex; align-items:flex-start; gap:.7rem;
+    padding:.7rem 0; border-bottom:1px solid #F3F4F6;
+}
+.news-item:last-child { border-bottom:none; }
+.news-date { font-size:.65rem; color:#9CA3AF; white-space:nowrap; margin-top:2px; }
+.news-source { font-size:.62rem; color:#6B7280; background:#F3F4F6;
+               border-radius:3px; padding:1px 5px; white-space:nowrap; }
+.news-title a { font-size:.82rem; color:#111827; text-decoration:none;
+                line-height:1.4; font-weight:500; }
+.news-title a:hover { color:#1A3A6B; text-decoration:underline; }
+
+/* 실적 변화 테이블 */
+.perf-row { display:flex; align-items:center; gap:.5rem;
+            padding:.45rem .5rem; border-radius:6px; margin-bottom:3px; }
+.perf-row:hover { background:#F8FAFF; }
+.perf-label { font-size:.78rem; color:#374151; font-weight:500; width:90px; flex-shrink:0; }
+.perf-curr  { font-size:.82rem; font-weight:700; color:#111; width:90px; text-align:right; }
+.perf-diff  { font-size:.78rem; font-weight:600; width:90px; text-align:right; }
+.perf-pct   { font-size:.78rem; font-weight:600; width:60px; text-align:right; }
+
+/* 사업 요약 */
+.biz-box { background:#F8FAFF; border-radius:10px; padding:1rem 1.2rem;
+           border-left:3px solid #1A3A6B; }
+.biz-text { font-size:.83rem; color:#374151; line-height:1.7; }
+.biz-tag { display:inline-block; background:#DBEAFE; color:#1E40AF;
+           border-radius:4px; padding:2px 8px; font-size:.7rem;
+           font-weight:600; margin:3px 3px 0 0; }
+
+/* 이슈 뱃지 */
+.issue-item { font-size:.8rem; color:#374151; padding:.4rem .7rem;
+              background:#F9FAFB; border-radius:6px; margin-bottom:4px;
+              border-left:2px solid #D1D5DB; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,6 +192,181 @@ def load_corps(key):
         return out
     except:
         return {}
+
+# ══ DART 기업정보 / 주주 / 뉴스 ══════════════
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_company_info(key, corp_code):
+    """DART 기업개황"""
+    try:
+        r = requests.get(f"{DART}/company.json",
+                         params={"crtfc_key": key, "corp_code": corp_code}, timeout=15)
+        d = r.json()
+        if d.get("status") == "000":
+            return d
+    except: pass
+    return {}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_shareholders(key, corp_code):
+    """5% 이상 대량보유자 (DART majorstock)"""
+    try:
+        r = requests.get(f"{DART}/majorstock.json",
+                         params={"crtfc_key": key, "corp_code": corp_code,
+                                 "reprt_code": "11011"}, timeout=15)
+        d = r.json()
+        if d.get("status") == "000":
+            return d.get("list", [])
+    except: pass
+    return []
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_executives(key, corp_code):
+    """임원 현황 (사업 요약 보완용)"""
+    try:
+        r = requests.get(f"{DART}/exctvSttus.json",
+                         params={"crtfc_key": key, "corp_code": corp_code,
+                                 "reprt_code": "11011"}, timeout=15)
+        d = r.json()
+        if d.get("status") == "000":
+            return d.get("list", [])[:3]
+    except: pass
+    return []
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_news(company_name, n=5):
+    """Google News RSS — 최신 뉴스"""
+    query = urllib.parse.quote(company_name + " 실적")
+    url   = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+    try:
+        r    = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        root = ET.fromstring(r.content)
+        items = root.findall(".//item")
+        news  = []
+        for item in items[:n]:
+            title  = item.findtext("title", "").strip()
+            link   = item.findtext("link",  "").strip()
+            pub    = item.findtext("pubDate", "").strip()
+            source = item.findtext("source", "").strip()
+            if not title or not link: continue
+            try:
+                dt       = datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M:%S")
+                date_str = dt.strftime("%Y.%m.%d")
+            except:
+                date_str = pub[:10] if pub else ""
+            news.append({"title": title, "link": link,
+                         "date": date_str, "source": source})
+        return news
+    except:
+        return []
+
+def build_shareholder_chart(shareholders):
+    """주주 파이차트"""
+    if not shareholders:
+        return None
+    labels, values = [], []
+    total_pct = 0.0
+    for s in shareholders:
+        nm  = s.get("nm", s.get("shrholdr_nm", "")).strip()
+        pct_str = s.get("trmend_posesn_stock_co", s.get("bsis_posesn_stock_co", "0"))
+        try:
+            pct = float(str(pct_str).replace(",", "")) /                   float(str(s.get("trmend_tot_stock", s.get("bsis_tot_stock", "1"))).replace(",","")) * 100
+        except:
+            continue
+        if nm and pct > 0:
+            labels.append(nm); values.append(round(pct, 1)); total_pct += pct
+    if not labels:
+        return None
+    # 기타 추가
+    other = round(100 - total_pct, 1)
+    if other > 0:
+        labels.append("기타 주주"); values.append(other)
+    colors = ["#1A3A6B","#3B82F6","#0D9488","#D97706","#7C3AED",
+              "#059669","#DC2626","#9CA3AF"]
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values,
+        hole=0.52,
+        marker=dict(colors=colors[:len(labels)],
+                    line=dict(color="white", width=2)),
+        textinfo="label+percent",
+        textfont=dict(size=11, family="Noto Sans KR"),
+        hovertemplate="%{label}<br>%{value:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(
+        showlegend=False,
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=240,
+        paper_bgcolor="white",
+        font=dict(family="Noto Sans KR"),
+        annotations=[dict(text="주주<br>구성", x=0.5, y=0.5,
+                          font=dict(size=12, color="#374151"), showarrow=False)]
+    )
+    return fig
+
+def build_perf_summary(kmap, years, name):
+    """전년 대비 실적 요약 텍스트 자동 생성"""
+    if len(years) < 2:
+        return []
+    latest = years[-1]; prev = years[-2]
+    kl = kmap.get(latest, {}); kp = kmap.get(prev, {})
+
+    def chg(cur, prv, label, unit="억원"):
+        if cur is None or prv is None or prv == 0:
+            return None
+        diff = cur - prv
+        pct  = (diff / abs(prv)) * 100
+        arrow = "▲" if diff > 0 else "▼"
+        color = "#059669" if diff > 0 else "#DC2626"
+        sign  = "+" if diff > 0 else ""
+        return {
+            "label": label,
+            "curr":  f"{cur:,.0f}{unit}",
+            "diff":  f"{sign}{diff:,.0f}{unit}",
+            "pct":   f"{sign}{pct:.1f}%",
+            "arrow": arrow,
+            "color": color,
+            "positive": diff > 0,
+        }
+
+    items = []
+    for cur_k, prv_k, label in [
+        ("rev", "rev", "매출"),
+        ("gp",  "gp",  "매출총이익"),
+        ("op",  "op",  "영업이익"),
+        ("ebi", "ebi", "EBITDA"),
+        ("net", "net", "당기순이익"),
+    ]:
+        r = chg(kl.get(cur_k), kp.get(prv_k), label)
+        if r: items.append(r)
+
+    # 이슈 자동 판단
+    issues = []
+    rv, op, net = kl.get("rev"), kl.get("op"), kl.get("net")
+    rv_p, op_p  = kp.get("rev"), kp.get("op")
+
+    if rv and rv_p:
+        g = (rv - rv_p) / abs(rv_p) * 100
+        if g >= 10:   issues.append(f"📈 매출 {g:.1f}% 고성장 — 사업 확대 국면")
+        elif g <= -10: issues.append(f"📉 매출 {abs(g):.1f}% 역성장 — 수요 둔화 또는 사업 재편 가능성")
+    if op is not None and op > 0 and op_p is not None and op_p <= 0:
+        issues.append("✅ 영업이익 흑자 전환 달성")
+    elif op is not None and op < 0 and op_p is not None and op_p > 0:
+        issues.append("⚠️ 영업이익 흑자 → 적자 전환")
+    elif op is not None and op_p is not None and op_p != 0:
+        g = (op - op_p) / abs(op_p) * 100
+        if g >= 30:    issues.append(f"✅ 영업이익 {g:.1f}% 대폭 개선")
+        elif g <= -30: issues.append(f"⚠️ 영업이익 {abs(g):.1f}% 대폭 감소")
+    if net is not None and net > 0:
+        if kp.get("net") is not None and kp.get("net") <= 0:
+            issues.append("✅ 당기순이익 흑자 전환")
+    ta, eq = kl.get("ta"), kl.get("eq")
+    tl = kl.get("tl")
+    if ta and eq and tl and eq != 0:
+        de = tl / eq * 100
+        if de > 300:   issues.append(f"⚠️ 부채비율 {de:.0f}% — 재무 레버리지 높음")
+        elif de < 50:  issues.append(f"✅ 부채비율 {de:.0f}% — 안정적 재무구조")
+
+    return {"items": items, "issues": issues, "latest": latest, "prev": prev}
 
 def corp_search(corps, q):
     q = q.strip()
@@ -733,6 +944,141 @@ def render(key):
     st.markdown(f"<p style='font-size:.65rem;color:#9CA3AF;margin:4px 0 0;'>조회 소스: {src_txt}</p>",
                 unsafe_allow_html=True)
     st.markdown("<div style='height:.7rem'></div>", unsafe_allow_html=True)
+
+    # ══ 신규: 기업 개요 + 주주구성 + 뉴스 ══
+    corp_info   = get_company_info(key, params["corp_code"])
+    shareholders = get_shareholders(key, params["corp_code"])
+    news_list   = get_news(name)
+    perf_data   = build_perf_summary(kmap, years, name)
+
+    # ── Row: 사업 요약 | 주주구성 | 뉴스 ──
+    col_biz, col_share, col_news = st.columns([2.2, 1.6, 2.2])
+
+    with col_biz:
+        st.markdown("<div class='sec'>사업 개요</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+        # DART 기업개황 정보
+        ind  = corp_info.get("induty_code_nm", corp_info.get("induty_cd", ""))
+        biz  = corp_info.get("bizr_no", "")
+        est  = corp_info.get("est_dt", "")
+        emp  = corp_info.get("emp_no", "")
+        addr = corp_info.get("adres", "")
+        hp   = corp_info.get("hm_url", "")
+        ceo  = corp_info.get("ceo_nm", "")
+
+        # 업종 태그
+        tags_html = ""
+        if ind:
+            for tag in ind.split("/")[:3]:
+                tags_html += f"<span class='biz-tag'>{tag.strip()}</span>"
+
+        info_rows = ""
+        for label, val in [("대표이사", ceo), ("설립일", est[:4]+"년 "+est[4:6]+"월" if est and len(est)>=6 else est),
+                           ("임직원", f"{int(emp):,}명" if emp and str(emp).isdigit() else emp),
+                           ("소재지", addr[:20]+"…" if len(addr)>20 else addr)]:
+            if val:
+                info_rows += (f"<div style='display:flex;gap:.5rem;padding:.25rem 0;border-bottom:1px solid #F3F4F6;'>"
+                              f"<span style='font-size:.7rem;color:#9CA3AF;width:60px;flex-shrink:0;'>{label}</span>"
+                              f"<span style='font-size:.75rem;color:#374151;font-weight:500;'>{val}</span></div>")
+
+        hp_html = f"<a href='{hp}' target='_blank' style='font-size:.7rem;color:#3B82F6;'>🔗 홈페이지</a>" if hp else ""
+
+        st.markdown(
+            f"<div class='biz-box'>{tags_html}</div>"
+            f"<div style='margin-top:.7rem;'>{info_rows}</div>"
+            f"<div style='margin-top:.6rem;'>{hp_html}</div>",
+            unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_share:
+        st.markdown("<div class='sec'>주주 구성</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card' style='padding:.8rem;'>", unsafe_allow_html=True)
+        if shareholders:
+            fig_pie = build_shareholder_chart(shareholders)
+            if fig_pie:
+                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+            # 주주 리스트
+            for s in shareholders[:5]:
+                nm  = s.get("nm", s.get("shrholdr_nm", "")).strip()
+                tot = s.get("trmend_tot_stock",""); pos = s.get("trmend_posesn_stock_co","")
+                try:
+                    pct = round(float(str(pos).replace(",","")) / float(str(tot).replace(",","")) * 100, 1)
+                    bar_w = int(pct)
+                    st.markdown(
+                        f"<div style='margin:.2rem 0;'>"
+                        f"<div style='display:flex;justify-content:space-between;font-size:.72rem;'>"
+                        f"<span style='color:#374151;font-weight:500;'>{nm[:12]}</span>"
+                        f"<span style='color:#1A3A6B;font-weight:700;'>{pct:.1f}%</span></div>"
+                        f"<div style='background:#EFF6FF;border-radius:4px;height:4px;margin-top:2px;'>"
+                        f"<div style='background:#1A3A6B;width:{min(bar_w,100)}%;height:4px;border-radius:4px;'></div></div>"
+                        f"</div>", unsafe_allow_html=True)
+                except: pass
+        else:
+            st.markdown("<div style='font-size:.8rem;color:#9CA3AF;text-align:center;padding:1rem;'>주주 정보 없음</div>",
+                        unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_news:
+        st.markdown("<div class='sec'>최신 뉴스</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        if news_list:
+            for news in news_list:
+                title  = news["title"].split(" - ")[0]  # 출처 제거
+                st.markdown(
+                    f"<div class='news-item'>"
+                    f"<div style='flex:1;'>"
+                    f"<div class='news-title'><a href='{news['link']}' target='_blank'>{title}</a></div>"
+                    f"<div style='display:flex;gap:.4rem;margin-top:3px;align-items:center;'>"
+                    f"<span class='news-date'>{news['date']}</span>"
+                    f"{'<span class="news-source">'+news["source"]+'</span>' if news['source'] else ''}"
+                    f"</div></div></div>",
+                    unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='font-size:.8rem;color:#9CA3AF;text-align:center;padding:1rem;'>뉴스를 불러올 수 없습니다</div>",
+                        unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── 전년 대비 실적 요약 ──
+    if perf_data and perf_data.get("items"):
+        st.markdown(f"<div class='sec'>{perf_data['prev']}→{perf_data['latest']} 실적 변화 요약</div>",
+                    unsafe_allow_html=True)
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        col_p1, col_p2 = st.columns([2, 1.5])
+
+        with col_p1:
+            # 헤더
+            st.markdown(
+                "<div style='display:flex;gap:.5rem;padding:.3rem .5rem;background:#F8FAFF;border-radius:6px;margin-bottom:4px;'>"
+                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;'>항목</span>"
+                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;text-align:right;'>최근 실적</span>"
+                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;text-align:right;'>전년비 변화</span>"
+                "<span style='font-size:.68rem;color:#9CA3AF;width:60px;text-align:right;'>증감률</span>"
+                "</div>", unsafe_allow_html=True)
+            for item in perf_data["items"]:
+                clr = item["color"]
+                st.markdown(
+                    f"<div class='perf-row'>"
+                    f"<span class='perf-label'>{item['label']}</span>"
+                    f"<span class='perf-curr'>{item['curr']}</span>"
+                    f"<span class='perf-diff' style='color:{clr};'>{item['arrow']} {item['diff']}</span>"
+                    f"<span class='perf-pct'  style='color:{clr};'>{item['pct']}</span>"
+                    f"</div>", unsafe_allow_html=True)
+
+        with col_p2:
+            st.markdown("<div style='padding-left:.5rem;'>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:.72rem;color:#6B7280;font-weight:600;margin-bottom:.5rem;'>주요 이슈</div>",
+                        unsafe_allow_html=True)
+            issues = perf_data.get("issues", [])
+            if issues:
+                for iss in issues:
+                    st.markdown(f"<div class='issue-item'>{iss}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div style='font-size:.78rem;color:#9CA3AF;'>특이사항 없음</div>",
+                            unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # KPI Row 1
     st.markdown("<div class='sec'>핵심 손익 지표</div>", unsafe_allow_html=True)
