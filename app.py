@@ -32,6 +32,39 @@ html, body, [class*="css"], .stApp {
 [data-testid="stSidebar"] .stMarkdown h2,
 [data-testid="stSidebar"] .stMarkdown h3 { color: #FFFFFF !important; }
 
+/* 라디오 버튼 스타일 */
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    display: block !important;
+    width: 100% !important;
+    padding: 0.55rem 1rem !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    background: rgba(255,255,255,0.07) !important;
+    color: #C8D8F0 !important;
+    font-size: 0.88rem !important;
+    margin-bottom: 4px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background: rgba(255,255,255,0.18) !important;
+    color: #FFFFFF !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label[data-selected="true"],
+[data-testid="stSidebar"] [data-testid="stRadio"] input:checked + div {
+    background: rgba(82,160,255,0.25) !important;
+    border-color: rgba(82,160,255,0.6) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {
+    color: inherit !important;
+    font-size: 0.88rem !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"] {
+    display: none !important;
+}
+
 [data-testid="stSidebar"] div[data-testid="stButton"] button {
     width: 100%;
     background: rgba(255,255,255,0.07) !important;
@@ -354,12 +387,20 @@ def render_sidebar(companies):
         if "selected" not in st.session_state:
             st.session_state.selected = list(companies.keys())[0]
 
-        for key, comp in companies.items():
-            is_active = st.session_state.selected == key
-            label = ("▶  " if is_active else "    ") + comp["company_name"]
-            if st.button(label, key=f"btn_{key}", use_container_width=True):
-                st.session_state.selected = key
-                st.rerun()
+        company_keys   = list(companies.keys())
+        company_labels = [companies[k]["company_name"] for k in company_keys]
+        current_idx    = company_keys.index(st.session_state.selected) if st.session_state.selected in company_keys else 0
+
+        selected_label = st.radio(
+            label="",
+            options=company_labels,
+            index=current_idx,
+            label_visibility="collapsed",
+        )
+        new_key = company_keys[company_labels.index(selected_label)]
+        if new_key != st.session_state.selected:
+            st.session_state.selected = new_key
+            st.rerun()
 
         st.markdown("""
         <div style='margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.08);'>
