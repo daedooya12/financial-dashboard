@@ -395,8 +395,13 @@ def build_table(ydata, years, key):
                 round((c - p) / abs(p) * 100, 1)
                 if c is not None and p and p != 0 else None)
         n, s, e = len(years)-1, vals[0], vals[-1]
-        row["CAGR"] = (round(((e/s)**(1/n)-1)*100, 1)
-                       if s and e and s != 0 and n > 0 else None)
+        try:
+            if s and e and s != 0 and n > 0 and (e/s) > 0:
+                row["CAGR"] = round(((e/s)**(1/n)-1)*100, 1)
+            else:
+                row["CAGR"] = None
+        except:
+            row["CAGR"] = None
         rows.append(row)
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
@@ -525,100 +530,64 @@ def sidebar():
                         unsafe_allow_html=True)
             return None
 
-        # ── 조회 방식 선택 ──
-        st.markdown("<div class='sidebar-lbl'>📋 조회 방식</div>", unsafe_allow_html=True)
-        mode = st.radio("", ["🔍 사업보고서 (상장사)", "📎 감사보고서 URL (비상장사)"],
-                        key="mode", label_visibility="collapsed")
-
-        is_audit = "감사보고서" in mode
-
-        # ── 공통: 연도 설정 ──
-        st.markdown("<div class='sidebar-lbl' style='margin-top:.8rem;'>📅 조회 연도</div>", unsafe_allow_html=True)
+        # ── 연도 설정 ──
+        st.markdown("<div class='sidebar-lbl'>📅 조회 연도</div>", unsafe_allow_html=True)
         year_opts = [2025, 2024, 2023, 2022, 2021, 2020]
         sel_years = st.multiselect("", year_opts, default=[2022, 2023, 2024, 2025],
                                    key="yrs", label_visibility="collapsed")
         sel_years = sorted(sel_years)
 
-        # ── 공통: 연결/개별 ──
+        # ── 연결/개별 ──
         fs_label = st.selectbox("", ["연결 우선 (CFS→OFS)", "개별 우선 (OFS→CFS)"],
                                 key="fs", label_visibility="collapsed")
         fs_div = "CFS" if "CFS" in fs_label else "OFS"
 
         st.markdown("<div style='height:.3rem'></div>", unsafe_allow_html=True)
 
-        # ══ 모드 A: 사업보고서 ══
-        if not is_audit:
-            st.markdown("<div class='sidebar-lbl'>🔍 회사 검색</div>", unsafe_allow_html=True)
-            query = st.text_input("", placeholder="회사명 입력 (예: 삼성전자)",
-                                  key="q", label_visibility="collapsed")
-            selected = None
-            if query and len(query.strip()) >= 1:
-                corps   = load_corps(key)
-                results = corp_search(corps, query.strip())
-                if results:
-                    labels  = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
-                    idx     = st.selectbox("", range(len(labels)),
-                                           format_func=lambda i: labels[i],
-                                           key="sel", label_visibility="collapsed")
-                    selected = results[idx]
-                else:
-                    st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
-                                unsafe_allow_html=True)
-
-            btn = st.button("📡 조회", use_container_width=True)
-            if btn:
-                if not selected: st.error("회사를 선택해주세요."); return key
-                if not sel_years: st.error("연도를 선택해주세요."); return key
-                nm, info = selected
-                st.session_state.params = {
-                    "mode": "business",
-                    "name": nm, "corp_code": info["corp_code"],
-                    "stock_code": info["stock_code"],
-                    "fs_div": fs_div, "years": sel_years,
-                }
-                st.session_state.cache = {}
-                st.rerun()
-
-        # ══ 모드 B: 감사보고서 URL ══
-        else:
-            st.markdown("<div class='sidebar-lbl'>🏢 회사명</div>", unsafe_allow_html=True)
-            corp_name = st.text_input("", placeholder="예: 티맵모빌리티",
-                                      key="audit_name", label_visibility="collapsed")
-
-            if sel_years:
-                st.markdown("<div class='sidebar-lbl' style='margin-top:.6rem;'>📎 연도별 감사보고서 URL</div>",
-                            unsafe_allow_html=True)
-                st.markdown("<div style='font-size:.68rem;color:#7B9EC4;margin-bottom:.5rem;'>DART 공시 → 감사보고서 → 주소창 URL 복붙</div>",
-                            unsafe_allow_html=True)
-                url_map = {}
-                for yr in sel_years:
-                    url = st.text_input("", placeholder=f"{yr}년 감사보고서 URL",
-                                        key=f"url_{yr}", label_visibility="collapsed")
-                    url_map[yr] = url.strip() if url else ""
+        # ── 회사 검색 ──
+        st.markdown("<div class='sidebar-lbl'>🔍 회사 검색</div>", unsafe_allow_html=True)
+        query = st.text_input("", placeholder="회사명 입력 (예: 삼성전자)",
+                              key="q", label_visibility="collapsed")
+        selected = None
+        if query and len(query.strip()) >= 1:
+            corps   = load_corps(key)
+            results = corp_search(corps, query.strip())
+            if results:
+                labels = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
+                idx    = st.selectbox("", range(len(labels)),
+                                      format_func=lambda i: labels[i],
+                                      key="sel", label_visibility="collapsed")
+                selected = results[idx]
             else:
-                url_map = {}
-                st.info("조회 연도를 먼저 선택해주세요.")
+                st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
+                            unsafe_allow_html=True)
 
-            btn = st.button("📡 조회", use_container_width=True)
-            if btn:
-                if not corp_name: st.error("회사명을 입력해주세요."); return key
-                if not sel_years: st.error("연도를 선택해주세요."); return key
-                filled = {yr: url for yr, url in url_map.items() if url}
-                if not filled: st.error("최소 1개 URL을 입력해주세요."); return key
-                st.session_state.params = {
-                    "mode": "audit",
-                    "name": corp_name, "url_map": url_map,
-                    "fs_div": fs_div, "years": sel_years,
-                }
-                st.session_state.cache = {}
+        btn = st.button("📡 조회", use_container_width=True)
+        if btn:
+            if not selected: st.error("회사를 선택해주세요."); return key
+            if not sel_years: st.error("연도를 선택해주세요."); return key
+            nm, info = selected
+            # 비상장사 차단
+            if not info["stock_code"]:
+                st.session_state.params = {"mode": "unlisted", "name": nm}
+                st.session_state.cache  = {}
                 st.rerun()
+                return key
+            st.session_state.params = {
+                "mode": "business",
+                "name": nm, "corp_code": info["corp_code"],
+                "stock_code": info["stock_code"],
+                "fs_div": fs_div, "years": sel_years,
+            }
+            st.session_state.cache = {}
+            st.rerun()
 
         # 하단 안내
         st.markdown("""
         <div style='margin-top:1.5rem;padding-top:.8rem;border-top:1px solid rgba(255,255,255,.1);
         font-size:.62rem;color:#4A6FA5;line-height:1.8;'>
-        📌 상장사 → 사업보고서 모드<br>
-        📌 비상장사 → 감사보고서 URL 모드<br>
+        📌 코스피 · 코스닥 상장사 지원<br>
+        📌 DART 사업보고서 기반<br>
         📌 단위: 억원
         </div>""", unsafe_allow_html=True)
 
@@ -638,26 +607,9 @@ def load_data(key, params):
 
     for i, yr in enumerate(years):
         prog.progress((i+1)/len(years), text=f"{yr}년 조회 중...")
-        raw  = []
-        src  = "없음"
-
-        if mode == "business":
-            corp_code = params["corp_code"]
-            raw, rc = fetch_business_report(key, corp_code, yr, fs_div)
-            src = rc or "없음"
-
-        elif mode == "audit":
-            url = params.get("url_map", {}).get(yr, "")
-            if url:
-                rcp = extract_rcp_no(url)
-                if rcp:
-                    raw, ep = fetch_by_rcpno(key, rcp, fs_div)
-                    src = (ep or "없음") + f"  (rcp:{rcp[:8]}…)"
-                else:
-                    src = "URL 오류 (rcpNo 추출 실패)"
-            else:
-                src = "URL 미입력"
-
+        corp_code = params["corp_code"]
+        raw, rc = fetch_business_report(key, corp_code, yr, fs_div)
+        src = rc or "없음"
         parsed = parse_raw(raw)
         ydata[yr]   = parsed
         sources[yr] = src
@@ -676,23 +628,42 @@ def render(key):
             <div style='font-size:2.5rem;margin-bottom:.8rem;'>📊</div>
             <div style='font-size:1.1rem;font-weight:600;color:#374151;margin-bottom:.4rem;'>SK Square 재무 분석 대시보드</div>
             <div style='font-size:.85rem;'>좌측에서 조회 방식을 선택하고 재무제표를 불러와 주세요</div>
-            <div style='margin-top:1.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;'>
-                <div style='background:#fff;border-radius:10px;padding:1rem 1.5rem;box-shadow:0 1px 6px rgba(0,0,0,.07);font-size:.82rem;color:#374151;'>
-                    <div style='font-size:1.2rem;margin-bottom:.3rem;'>🔍</div>
-                    <strong>사업보고서</strong><br>상장사 / DART에 사업보고서 제출 법인
-                </div>
-                <div style='background:#fff;border-radius:10px;padding:1rem 1.5rem;box-shadow:0 1px 6px rgba(0,0,0,.07);font-size:.82rem;color:#374151;'>
-                    <div style='font-size:1.2rem;margin-bottom:.3rem;'>📎</div>
-                    <strong>감사보고서 URL</strong><br>비상장사 / 감사보고서만 제출하는 법인
-                </div>
+            <div style='margin-top:1.5rem;background:#fff;border-radius:10px;padding:1rem 1.5rem;
+                display:inline-block;box-shadow:0 1px 6px rgba(0,0,0,.07);font-size:.82rem;color:#374151;'>
+                📈 코스피 · 코스닥 상장사 DART 사업보고서 기반 조회
             </div>
         </div>""", unsafe_allow_html=True)
         return
 
-    name   = params["name"]
+    name = params["name"]
+    mode = params["mode"]
+
+    # ── 비상장사 안내 화면 ──
+    if mode == "unlisted":
+        st.markdown(f"""
+        <div style='max-width:520px;margin:4rem auto;background:white;border-radius:16px;
+        padding:2.5rem 2rem;box-shadow:0 4px 20px rgba(0,0,0,0.08);text-align:center;'>
+            <div style='font-size:2.5rem;margin-bottom:1rem;'>🏢</div>
+            <div style='font-size:1.15rem;font-weight:700;color:#111827;margin-bottom:.6rem;'>
+                비상장사는 지원하지 않습니다
+            </div>
+            <div style='font-size:.88rem;color:#6B7280;line-height:1.7;margin-bottom:1.5rem;'>
+                <strong>{name}</strong>은(는) DART에 사업보고서를 제출하지 않는 비상장 법인입니다.<br>
+                현재 대시보드는 DART 사업보고서 기반으로 동작하며,<br>
+                <strong>코스피 · 코스닥 상장사</strong>만 조회할 수 있습니다.
+            </div>
+            <div style='background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;
+            padding:1rem 1.2rem;font-size:.82rem;color:#0369A1;text-align:left;line-height:1.8;'>
+                💡 <strong>상장사 예시</strong><br>
+                삼성전자 · SK하이닉스 · 카카오 · NAVER · LG에너지솔루션<br>
+                KT&amp;G · 현대차 · 셀트리온 · 기아 · 포스코홀딩스
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
     years  = params["years"]
     fs_div = params["fs_div"]
-    mode   = params["mode"]
 
     # 캐시 키
     ckey = name + "_" + fs_div + "_" + "_".join(map(str, years))
