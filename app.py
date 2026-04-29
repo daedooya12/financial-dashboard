@@ -204,27 +204,32 @@ DEP_KEYWORDS = ["감가상각비", "상각비"]
 
 def get_is_items(fs_list):
     """손익계산서 항목만 추출 (DART 원본 순서 유지)"""
+    # 1순위: 순수 손익계산서 (포괄 제외)
     seen = set()
     items = []
     for item in fs_list:
         sj = item.get("sj_nm", "")
-        # 연결/개별 손익계산서 & 포괄손익 제외(순손익까지만)
         if not any(kw in sj for kw in IS_KEYWORDS): continue
         if "포괄" in sj: continue
-        acnt_id   = item.get("account_id", "")
-        acnt_nm   = item.get("account_nm", "").strip()
-        indent    = item.get("indent_level", item.get("account_detail", "0"))
-        curr_amt  = parse_amount(item.get("thstrm_amount"))
-        prev_amt  = parse_amount(item.get("frmtrm_amount"))
-        key = acnt_nm
-        if key in seen: continue
-        seen.add(key)
-        items.append({
-            "account_nm": acnt_nm,
-            "account_id": acnt_id,
-            "curr": curr_amt,
-            "prev": prev_amt,
-        })
+        acnt_nm  = item.get("account_nm", "").strip()
+        acnt_id  = item.get("account_id", "")
+        curr_amt = parse_amount(item.get("thstrm_amount"))
+        prev_amt = parse_amount(item.get("frmtrm_amount"))
+        if acnt_nm in seen: continue
+        seen.add(acnt_nm)
+        items.append({"account_nm": acnt_nm, "account_id": acnt_id, "curr": curr_amt, "prev": prev_amt})
+    # 2순위: 손익계산서가 없으면 포괄손익계산서 사용 (일부 회사)
+    if not items:
+        for item in fs_list:
+            sj = item.get("sj_nm", "")
+            if not any(kw in sj for kw in IS_KEYWORDS): continue
+            acnt_nm  = item.get("account_nm", "").strip()
+            acnt_id  = item.get("account_id", "")
+            curr_amt = parse_amount(item.get("thstrm_amount"))
+            prev_amt = parse_amount(item.get("frmtrm_amount"))
+            if acnt_nm in seen: continue
+            seen.add(acnt_nm)
+            items.append({"account_nm": acnt_nm, "account_id": acnt_id, "curr": curr_amt, "prev": prev_amt})
     return items
 
 def get_cf_dep(fs_list):
@@ -578,20 +583,21 @@ def render_main(api_key):
         return round(v, 1), "pos" if v >= 0 else "neg"
 
     def kpi_html(label, yr, val, yoy_val, yoy_cls, margin_label=None, margin_val=None, color="blue"):
-        val_str = f"{val:,.0f}억" if val is not None else "—"
+        val_str = ("{:,.0f}억".format(val)) if val is not None else "—"
         val_cls = "neg" if (val is not None and val < 0) else "pos"
         yoy_str = ""
         if yoy_val is not None:
             arrow = "▲" if yoy_val > 0 else ("▼" if yoy_val < 0 else "")
-            yoy_str = f"<div class='kpi-yoy {yoy_cls}'>{arrow} {abs(yoy_val):.1f}% YoY</div>"
+            yoy_str = "<div class='kpi-yoy " + yoy_cls + "'>" + arrow + " " + "{:.1f}".format(abs(yoy_val)) + "% YoY</div>"
         margin_str = ""
         if margin_label and margin_val is not None:
-            margin_str = f"<div class='kpi-sub'>{margin_label}: {margin_val:.1f}%</div>"
-        return f"""<div class='kpi-card {color}'>
-            <div class='kpi-label'>{label} {yr}</div>
-            <div class='kpi-value {val_cls}'>{val_str}</div>
-            {yoy_str}{margin_str}
-        </div>"""
+            margin_str = "<div class='kpi-sub'>" + margin_label + ": " + "{:.1f}".format(margin_val) + "%</div>"
+        card  = "<div class='kpi-card " + color + "'>"
+        card += "<div class='kpi-label'>" + str(label) + " " + str(yr) + "</div>"
+        card += "<div class='kpi-value " + val_cls + "'>" + val_str + "</div>"
+        card += yoy_str + margin_str
+        card += "</div>"
+        return card
 
     k_latest = kpis.get(latest, {})
     k_prev   = kpis.get(prev, {}) if prev else {}
