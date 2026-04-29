@@ -1128,6 +1128,64 @@ def render(key):
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # ── 실적 변화 + 뉴스 ──
+    col_perf, col_news_panel = st.columns([1.6, 1])
+
+    with col_perf:
+        if perf_data and perf_data.get("items"):
+            prev_yr   = str(perf_data["prev"])
+            latest_yr = str(perf_data["latest"])
+            st.markdown("<div class='sec'>" + prev_yr + " → " + latest_yr + " 실적 변화</div>",
+                        unsafe_allow_html=True)
+            st.markdown("<div class='card'>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='display:grid;grid-template-columns:90px 1fr 1fr 65px;"
+                "gap:.4rem;padding:.3rem .5rem;background:#F8FAFF;border-radius:6px;"
+                "margin-bottom:3px;font-size:.66rem;color:#9CA3AF;'>"
+                "<span>항목</span>"
+                "<span style='text-align:right;'>최근(" + latest_yr + ")</span>"
+                "<span style='text-align:right;'>전년비</span>"
+                "<span style='text-align:right;'>증감률</span></div>",
+                unsafe_allow_html=True)
+            for item in perf_data["items"]:
+                clr = item["color"]
+                st.markdown(
+                    "<div style='display:grid;grid-template-columns:90px 1fr 1fr 65px;"
+                    "gap:.4rem;padding:.3rem .5rem;border-radius:6px;'>"
+                    "<span style='font-size:.77rem;color:#374151;font-weight:500;'>" + item["label"] + "</span>"
+                    "<span style='font-size:.79rem;font-weight:700;color:#111;text-align:right;'>" + item["curr"] + "</span>"
+                    "<span style='font-size:.77rem;font-weight:600;color:" + clr + ";text-align:right;'>" + item["arrow"] + " " + item["diff"] + "</span>"
+                    "<span style='font-size:.77rem;font-weight:600;color:" + clr + ";text-align:right;'>" + item["pct"] + "</span>"
+                    "</div>",
+                    unsafe_allow_html=True)
+            issues = perf_data.get("issues", [])
+            if issues:
+                st.markdown("<div style='margin-top:.6rem;border-top:1px solid #F3F4F6;padding-top:.5rem;'>",
+                            unsafe_allow_html=True)
+                for iss in issues:
+                    st.markdown("<div class='issue-item'>" + iss + "</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_news_panel:
+        st.markdown("<div class='sec'>최신 뉴스</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        if news_list:
+            for nw in news_list:
+                title = nw["title"].split(" - ")[0]
+                src_tag = "<span class='news-source'>" + nw["source"] + "</span>" if nw.get("source") else ""
+                st.markdown(
+                    "<div class='news-item'><div style='flex:1;'>"
+                    "<div class='news-title'><a href='" + nw["link"] + "' target='_blank'>" + title + "</a></div>"
+                    "<div style='display:flex;gap:.4rem;margin-top:3px;align-items:center;'>"
+                    "<span class='news-date'>" + nw["date"] + "</span>" + src_tag +
+                    "</div></div></div>",
+                    unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='font-size:.8rem;color:#9CA3AF;text-align:center;padding:2rem 1rem;'>뉴스를 불러올 수 없습니다</div>",
+                        unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
     # 재무제표 3종
     for tkey, title, hd in [
         ("pl", "손익계산서 (P&L)", "sec"),
