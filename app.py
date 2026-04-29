@@ -43,13 +43,23 @@ html, body, [class*="css"], .stApp { font-family:'Noto Sans KR',sans-serif; back
 
 /* 사이드바 입력창 */
 [data-testid="stSidebar"] input[type="text"] {
-    background:rgba(255,255,255,0.1) !important;
-    color:#FFFFFF !important; border:1px solid rgba(255,255,255,0.2) !important;
+    background:#FFFFFF !important;
+    color:#1A3A6B !important;
+    border:1px solid rgba(255,255,255,0.4) !important;
     border-radius:6px !important;
+    font-size:0.85rem !important;
 }
-[data-testid="stSidebar"] input[type="text"]::placeholder { color:rgba(255,255,255,0.4) !important; }
+[data-testid="stSidebar"] input[type="text"]::placeholder { color:#9CA3AF !important; }
 [data-testid="stSidebar"] .stTextInput label { color:#93B4D8 !important; font-size:0.72rem !important; }
 [data-testid="stSidebar"] .stSelectbox label { color:#93B4D8 !important; font-size:0.72rem !important; }
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+    background:#FFFFFF !important; border-radius:6px !important;
+}
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] * { color:#1A3A6B !important; }
+[data-testid="stSidebar"] .stMultiSelect div[data-baseweb="select"] {
+    background:#FFFFFF !important; border-radius:6px !important;
+}
+[data-testid="stSidebar"] .stMultiSelect span { color:#1A3A6B !important; }
 [data-testid="stSidebar"] div[data-testid="stButton"] button {
     width:100%; background:rgba(255,255,255,0.07) !important;
     color:#C8D8F0 !important; border:1px solid rgba(255,255,255,0.15) !important;
