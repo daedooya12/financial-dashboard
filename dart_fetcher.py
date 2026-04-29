@@ -42,13 +42,18 @@ def get_corp_list(api_key):
 
 def search_corp(corps, query):
     """회사명으로 기업 코드 검색"""
-    query = query.strip()
-    # 정확히 일치
-    if query in corps:
-        return [(query, corps[query])]
-    # 부분 일치
-    results = [(k, v) for k, v in corps.items() if query in k]
-    return results[:10]
+    query_norm = query.replace(" ", "").lower()
+    if not query_norm:
+        return []
+    exact = []
+    partial = []
+    for k, v in corps.items():
+        k_norm = k.replace(" ", "").lower()
+        if k_norm == query_norm:
+            exact.append((k, v))
+        elif query_norm in k_norm:
+            partial.append((k, v))
+    return (exact + partial)[:10]
 
 # ── 2. 재무제표 조회 ──────────────────────────────────────────
 def get_financial_statement(api_key, corp_code, bsns_year, reprt_code="11011", fs_div="CFS"):

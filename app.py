@@ -369,10 +369,16 @@ def build_perf_summary(kmap, years, name):
     return {"items": items, "issues": issues, "latest": latest, "prev": prev}
 
 def corp_search(corps, q):
-    q = q.strip()
-    if not q: return []
-    exact   = [(k, v) for k, v in corps.items() if k == q]
-    partial = [(k, v) for k, v in corps.items() if q in k and k != q]
+    q_norm = q.replace(" ", "").lower()
+    if not q_norm: return []
+    exact = []
+    partial = []
+    for k, v in corps.items():
+        k_norm = k.replace(" ", "").lower()
+        if k_norm == q_norm:
+            exact.append((k, v))
+        elif q_norm in k_norm:
+            partial.append((k, v))
     return (exact + partial)[:10]
 
 # ── 사업보고서 재무 조회 ──────────────────────
