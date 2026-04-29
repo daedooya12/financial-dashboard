@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 st.set_page_config(
-    page_title="상장법인 Dart 조회",
+    page_title="SK Square | 재무 분석",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -77,7 +77,6 @@ html, body, [class*="css"], .stApp {
 .kpi-card.red    { border-top-color: #DC2626; }
 .kpi-card.teal   { border-top-color: #0D9488; }
 .kpi-card.amber  { border-top-color: #D97706; }
-.kpi-card.purple { border-top-color: #8B5CF6; }
 .kpi-card.gray   { border-top-color: #6B7280; }
 .kpi-label { font-size: .66rem; color: #9CA3AF; font-weight: 600;
              letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
@@ -181,22 +180,17 @@ def api_key():
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_corps(key):
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        r    = requests.get(f"{DART}/corpCode.xml", params={"crtfc_key": key}, timeout=30, headers=headers)
+        r    = requests.get(f"{DART}/corpCode.xml", params={"crtfc_key": key}, timeout=30)
         z    = zipfile.ZipFile(io.BytesIO(r.content))
         root = ET.fromstring(z.read("CORPCODE.xml"))
         out  = {}
         for item in root.findall("list"):
-            n = (item.findtext("corp_name") or "").strip()
-            c = (item.findtext("corp_code") or "").strip()
-            s = (item.findtext("stock_code") or "").strip()
+            n = item.findtext("corp_name", "").strip()
+            c = item.findtext("corp_code", "").strip()
+            s = item.findtext("stock_code", "").strip()
             if n and c: out[n] = {"corp_code": c, "stock_code": s}
-        print(f"DEBUG: load_corps success, loaded {len(out)} companies.")
         return out
-    except Exception as e:
-        import traceback
-        print("DEBUG: load_corps exception:", e)
-        traceback.print_exc()
+    except:
         return {}
 
 # ══ DART 기업정보 / 주주 / 뉴스 ══════════════
@@ -375,13 +369,11 @@ def build_perf_summary(kmap, years, name):
     return {"items": items, "issues": issues, "latest": latest, "prev": prev}
 
 def corp_search(corps, q):
-    q = q.strip().upper()
-    q_clean = q.replace(" ", "")
+    q = q.strip()
     if not q: return []
-    exact   = [(k, v) for k, v in corps.items() if k.upper() == q]
-    partial = [(k, v) for k, v in corps.items() if q_clean in k.upper().replace(" ", "") and k.upper() != q]
-    results = (exact + partial)[:10]
-    return results
+    exact   = [(k, v) for k, v in corps.items() if k == q]
+    partial = [(k, v) for k, v in corps.items() if q in k and k != q]
+    return (exact + partial)[:10]
 
 # ── 사업보고서 재무 조회 ──────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -706,7 +698,7 @@ def make_chart(kmap, years):
     fig = go.Figure()
     for name, vals, color in [
         ("매출",    rev, "#1A3A6B"),
-        ("EBITDA",  ebi, "#8B5CF6"),
+        ("EBITDA",  ebi, "#0D9488"),
     ]:
         fig.add_trace(go.Bar(name=name, x=yr, y=vals,
             marker_color=color, opacity=0.85, marker_line_width=0,
@@ -739,9 +731,9 @@ def sidebar():
         # 헤더
         st.markdown("""
         <div style='padding:1.3rem 0 .9rem;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:1rem;'>
-            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>FINANCIAL DASHBOARD</div>
-            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>상장법인<br>Dart 조회</div>
-            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>DART OpenAPI 기반</div>
+            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>SK SQUARE</div>
+            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>투자분석<br>재무 대시보드</div>
+            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>DART OpenAPI</div>
         </div>""", unsafe_allow_html=True)
 
         if not key:
@@ -770,19 +762,16 @@ def sidebar():
         selected = None
         if query and len(query.strip()) >= 1:
             corps   = load_corps(key)
-            if not corps:
-                st.error("DART API에서 회사 목록을 불러오지 못했습니다. API 키가 유효한지 확인해주세요.")
+            results = corp_search(corps, query.strip())
+            if results:
+                labels = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
+                idx    = st.selectbox("", range(len(labels)),
+                                      format_func=lambda i: labels[i],
+                                      key="sel", label_visibility="collapsed")
+                selected = results[idx]
             else:
-                results = corp_search(corps, query.strip())
-                if results:
-                    labels = [("📈 " if v["stock_code"] else "🏢 ") + n for n, v in results]
-                    idx    = st.selectbox("", range(len(labels)),
-                                          format_func=lambda i: labels[i],
-                                          key="sel", label_visibility="collapsed")
-                    selected = results[idx]
-                else:
-                    st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
-                                unsafe_allow_html=True)
+                st.markdown("<div style='font-size:.75rem;color:#F87171;'>검색 결과 없음</div>",
+                            unsafe_allow_html=True)
 
         btn = st.button("📡 조회", use_container_width=True)
         if btn:
@@ -848,7 +837,7 @@ def render(key):
         st.markdown("""
         <div class='empty-wrap'>
             <div style='font-size:2.5rem;margin-bottom:.8rem;'>📊</div>
-            <div style='font-size:1.1rem;font-weight:600;color:#374151;margin-bottom:.4rem;'>상장법인 Dart 조회 대시보드</div>
+            <div style='font-size:1.1rem;font-weight:600;color:#374151;margin-bottom:.4rem;'>SK Square 재무 분석 대시보드</div>
             <div style='font-size:.85rem;'>좌측에서 조회 방식을 선택하고 재무제표를 불러와 주세요</div>
             <div style='margin-top:1.5rem;background:#fff;border-radius:10px;padding:1rem 1.5rem;
                 display:inline-block;box-shadow:0 1px 6px rgba(0,0,0,.07);font-size:.82rem;color:#374151;'>
@@ -1101,7 +1090,7 @@ def render(key):
              sub=f"OPM {om:.1f}%" if om else None,
              color="green" if (ov and ov >= 0) else "red")
     r1 += kc(f"EBITDA {latest}",      ev, yoy_c(ev, ep),
-             sub=f"margin {em:.1f}%" if em else None, color="purple")
+             sub=f"margin {em:.1f}%" if em else None, color="teal")
     r1 += kc(f"세전이익 {latest}",    bv, yoy_c(bv, bp), color="amber")
     r1 += kc(f"당기순이익 {latest}",  nv, yoy_c(nv, np_),
              sub=f"NPM {nm_:.1f}%" if nm_ else None,
