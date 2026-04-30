@@ -322,8 +322,8 @@ def build_perf_summary(kmap, years, name):
         sign  = "+" if diff > 0 else ""
         return {
             "label": label,
-            "curr":  f"{cur:,.0f}{unit}",
-            "diff":  f"{sign}{diff:,.0f}{unit}",
+            "curr":  fmt_money(cur),
+            "diff":  fmt_money_diff(diff),
             "pct":   f"{sign}{pct:.1f}%",
             "arrow": arrow,
             "color": color,
@@ -674,8 +674,29 @@ def style_table(df, years):
 # ══════════════════════════════════════════════
 #  KPI 카드 / 차트
 # ══════════════════════════════════════════════
+def fmt_money(val):
+    """조단위 이상이면 조로, 아니면 억으로 표시"""
+    if val is None: return "—"
+    abs_val = abs(val)
+    if abs_val >= 10000:  # 1조 이상
+        jo = val / 10000
+        return "{:,.2f}조".format(jo)
+    else:
+        return "{:,.0f}억".format(val)
+
+def fmt_money_diff(val):
+    """차이값 포맷 (부호 포함)"""
+    if val is None: return "—"
+    sign = "+" if val >= 0 else ""
+    abs_val = abs(val)
+    if abs_val >= 10000:
+        jo = val / 10000
+        return "{}{:,.2f}조".format(sign, jo)
+    else:
+        return "{}{:,.0f}억".format(sign, val)
+
 def kc(label, val, yoy=None, sub=None, color="blue", pct=False):
-    vs = ("{:.1f}%".format(val) if pct else "{:,.0f}억".format(val)) if val is not None else "—"
+    vs = ("{:.1f}%".format(val) if pct else fmt_money(val)) if val is not None else "—"
     vc = "pos" if (val and val >= 0) else ("neg" if (val is not None and val < 0) else "")
     yh = ""
     if yoy is not None:
