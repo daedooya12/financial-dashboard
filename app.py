@@ -699,24 +699,23 @@ def make_chart(kmap, years):
     yr  = [str(y) for y in vy]
     rev = [kmap[y].get("rev") or 0 for y in vy]
     op  = [kmap[y].get("op")  or 0 for y in vy]
-    net = [kmap[y].get("net") or 0 for y in vy]
     ebi = [kmap[y].get("ebi") or 0 for y in vy]
     fig = go.Figure()
-    for name, vals, color in [
-        ("매출",    rev, "#1A3A6B"),
-        ("EBITDA",  ebi, "#059669"),
-    ]:
-        fig.add_trace(go.Bar(name=name, x=yr, y=vals,
-            marker_color=color, opacity=0.85, marker_line_width=0,
-            text=["{:,.0f}".format(v) for v in vals],
-            textposition="outside", textfont=dict(size=10, color=color)))
+    # 매출 — 네이비
+    fig.add_trace(go.Bar(name="매출", x=yr, y=rev,
+        marker_color="#1A3A6B", opacity=0.85, marker_line_width=0,
+        text=["{:,.0f}".format(v) for v in rev],
+        textposition="outside", textfont=dict(size=10, color="#1A3A6B")))
+    # EBITDA — 주황색
+    fig.add_trace(go.Bar(name="EBITDA", x=yr, y=ebi,
+        marker_color="#F59E0B", opacity=0.85, marker_line_width=0,
+        text=["{:,.0f}".format(v) for v in ebi],
+        textposition="outside", textfont=dict(size=10, color="#D97706")))
+    # 영업이익 — 초록(흑자) / 빨강(적자)
     fig.add_trace(go.Bar(name="영업이익", x=yr, y=op, opacity=0.85, marker_line_width=0,
         marker_color=["#DC2626" if v < 0 else "#059669" for v in op],
         text=["{:,.0f}".format(v) for v in op],
         textposition="outside", textfont=dict(size=10)))
-    fig.add_trace(go.Scatter(name="당기순이익", x=yr, y=net, mode="lines+markers",
-        line=dict(color="#D97706", width=2.5, dash="dot"),
-        marker=dict(size=9, color="#D97706", line=dict(color="white", width=2))))
     fig.update_layout(
         barmode="group", plot_bgcolor="white", paper_bgcolor="white",
         height=300, margin=dict(l=0, r=0, t=10, b=0),
