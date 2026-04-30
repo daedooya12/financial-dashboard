@@ -871,6 +871,84 @@ def render(key):
             unsafe_allow_html=True)
         return
 
+    years  = params["years"]
+    fs_div = params["fs_div"]
+
+    # ── 캐시 키 ──
+    ckey  = name + "_" + fs_div + "_" + "_".join(map(str, years))
+    cache = st.session_state.get("cache", {})
+
+    if ckey not in cache:
+        ydata, sources = {}, {}
+        prog = st.progress(0, text=f"{name} 데이터 로딩 중...")
+        for i, yr in enumerate(years):
+            prog.progress((i+1)/len(years), text=f"{yr}년 조회 중...")
+            raw, rc = fetch_business_report(key, params["corp_code"], yr, fs_div)
+            ydata[yr]   = parse_raw(raw)
+            sources[yr] = rc or "없음"
+        prog.empty()
+        cache[ckey] = {"ydata": ydata, "sources": sources}
+        st.session_state.cache = cache
+    else:
+        ydata   = cache[ckey]["ydata"]
+        sources = cache[ckey]["sources"]
+
+    # ── KPI 계산 ──
+    kmap = {}
+    for yr in years:
+        kv   = ydata[yr]["kv"]
+        all_ = ydata[yr]["pl"] + ydata[yr]["bs"] + ydata[yr]["cf"]
+        rev  = get_val(kv, all_, "revenue")
+        op   = get_val(kv, all_, "op_income")
+        net  = get_val(kv, all_, "net_income")
+        ebt  = get_val(kv, all_, "ebt")
+        gp   = get_val(kv, all_, "gross_profit")
+        ta   = get_val(kv, all_, "total_assets")
+        tl   = get_val(kv, all_, "total_liab")
+        eq   = get_val(kv, all_, "total_equity")
+        dep  = get_val(kv, all_, "dep") or 0
+        ebi  = (op + dep) if op is not None else None
+        kmap[yr] = {"rev":rev,"op":op,"op_income":op,"net":net,"net_income":net,
+                    "ebt":ebt,"gp":gp,"gross_profit":gp,"ebi":ebi,"dep":dep,
+                    "ta":ta,"tl":tl,"total_liab":tl,"eq":eq,"total_equity":eq}
+
+    latest = years[-1]
+    prev   = years[-2] if len(years) >= 2 else None
+    kl = kmap.get(latest, {}); kp = kmap.get(prev, {}) if prev else {}
+
+    rv = kl.get("rev");  rp  = kp.get("rev")
+    ov = kl.get("op");   op_ = kp.get("op")
+    nv = kl.get("net");  np_ = kp.get("net")
+    bv = kl.get("ebt");  bp  = kp.get("ebt")
+    gv = kl.get("gp");   gp_ = kp.get("gp")
+    ev = kl.get("ebi");  ep  = kp.get("ebi")
+    ta = kl.get("ta");   ta_ = kp.get("ta")
+    tl = kl.get("tl")
+    eq = kl.get("eq");   eq_ = kp.get("eq")
+
+    om  = pct_m(ov, rv); gm  = pct_m(gv, rv)
+    nm_ = pct_m(nv, rv); em  = pct_m(ev, rv)
+    de  = round(tl/eq*100,1) if (tl and eq and eq!=0) else None
+    roe = pct_m(nv, eq); roa = pct_m(nv, ta)
+    at_ = round(rv/ta,2) if (rv and ta and ta!=0) else None
+
+    perf_data = build_perf_summary(kmap, years, name)
+    news_list = get_news(name)
+
+    # ── 헤더 ──
+    std = "K-IFRS 연결" if fs_div == "CFS" else "K-GAAP 개별"
+    src_txt = " · ".join([f"{y}: {sources.get(y,'—')}" for y in years])
+    st.markdown(f"<div class='page-title'>{name}</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<span class='badge b-blue'>상장 📈</span>"
+        "<span class='badge b-green'>사업보고서</span>"
+        f"<span class='badge b-teal'>{std}</span>"
+        f"<span class='badge b-gray'>{min(years)}~{max(years)}</span>",
+        unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:.64rem;color:#9CA3AF;margin:4px 0 0;'>조회 소스: {src_txt}</p>",
+                unsafe_allow_html=True)
+    st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
+
     # KPI Row 1
     st.markdown("<div class='sec'>핵심 손익 지표</div>", unsafe_allow_html=True)
     r1 = "<div class='kpi-row kpi-row-6'>"
