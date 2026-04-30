@@ -704,7 +704,7 @@ def make_chart(kmap, years):
     fig = go.Figure()
     for name, vals, color in [
         ("매출",    rev, "#1A3A6B"),
-        ("EBITDA",  ebi, "#0D9488"),
+        ("EBITDA",  ebi, "#059669"),
     ]:
         fig.add_trace(go.Bar(name=name, x=yr, y=vals,
             marker_color=color, opacity=0.85, marker_line_width=0,
@@ -857,234 +857,19 @@ def render(key):
 
     # ── 비상장사 안내 화면 ──
     if mode == "unlisted":
-        st.markdown(f"""
-        <div style='max-width:520px;margin:4rem auto;background:white;border-radius:16px;
-        padding:2.5rem 2rem;box-shadow:0 4px 20px rgba(0,0,0,0.08);text-align:center;'>
-            <div style='font-size:2.5rem;margin-bottom:1rem;'>🏢</div>
-            <div style='font-size:1.15rem;font-weight:700;color:#111827;margin-bottom:.6rem;'>
-                비상장사는 지원하지 않습니다
-            </div>
-            <div style='font-size:.88rem;color:#6B7280;line-height:1.7;margin-bottom:1.5rem;'>
-                <strong>{name}</strong>은(는) DART에 사업보고서를 제출하지 않는 비상장 법인입니다.<br>
-                현재 대시보드는 DART 사업보고서 기반으로 동작하며,<br>
-                <strong>코스피 · 코스닥 상장사</strong>만 조회할 수 있습니다.
-            </div>
-            <div style='background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;
-            padding:1rem 1.2rem;font-size:.82rem;color:#0369A1;text-align:left;line-height:1.8;'>
-                💡 <strong>상장사 예시</strong><br>
-                삼성전자 · SK하이닉스 · 카카오 · NAVER · LG에너지솔루션<br>
-                KT&amp;G · 현대차 · 셀트리온 · 기아 · 포스코홀딩스
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-
-    years  = params["years"]
-    fs_div = params["fs_div"]
-
-    # 캐시 키
-    ckey = name + "_" + fs_div + "_" + "_".join(map(str, years))
-    if mode == "audit":
-        ckey += "_audit"
-    cache = st.session_state.get("cache", {})
-
-    if ckey not in cache:
-        ydata, sources = load_data(key, params)
-        cache[ckey] = {"ydata": ydata, "sources": sources}
-        st.session_state.cache = cache
-    else:
-        ydata   = cache[ckey]["ydata"]
-        sources = cache[ckey]["sources"]
-
-    # KPI 계산
-    kmap = {}
-    for yr in years:
-        kv  = ydata[yr]["kv"]
-        all_= ydata[yr]["pl"] + ydata[yr]["bs"] + ydata[yr]["cf"]
-        rev = get_val(kv, all_, "revenue")
-        op  = get_val(kv, all_, "op_income")
-        net = get_val(kv, all_, "net_income")
-        ebt = get_val(kv, all_, "ebt")
-        gp  = get_val(kv, all_, "gross_profit")
-        ta  = get_val(kv, all_, "total_assets")
-        tl  = get_val(kv, all_, "total_liab")
-        eq  = get_val(kv, all_, "total_equity")
-        dep = get_val(kv, all_, "dep") or 0
-        ebi = (op + dep) if op is not None else None
-        kmap[yr] = {"rev": rev, "op": op, "net": net, "ebt": ebt, "gp": gp,
-                    "ebi": ebi, "dep": dep, "ta": ta, "tl": tl, "eq": eq}
-
-    latest = years[-1]
-    prev   = years[-2] if len(years) >= 2 else None
-    kl     = kmap.get(latest, {})
-    kp     = kmap.get(prev, {}) if prev else {}
-
-    rv = kl.get("rev"); rp = kp.get("rev")
-    ov = kl.get("op");  op_= kp.get("op")
-    nv = kl.get("net"); np_= kp.get("net")
-    bv = kl.get("ebt"); bp = kp.get("ebt")
-    gv = kl.get("gp");  gp_= kp.get("gp")
-    ev = kl.get("ebi"); ep = kp.get("ebi")
-    ta = kl.get("ta");  ta_= kp.get("ta")
-    tl = kl.get("tl")
-    eq = kl.get("eq");  eq_= kp.get("eq")
-
-    om  = pct_m(ov, rv); gm = pct_m(gv, rv)
-    nm_ = pct_m(nv, rv); em = pct_m(ev, rv)
-    de  = round(tl/eq*100, 1) if (tl and eq and eq != 0) else None
-    roe = pct_m(nv, eq);  roa = pct_m(nv, ta)
-    at_ = round(rv/ta, 2) if (rv and ta and ta != 0) else None
-
-    # 헤더
-    mode_badge = "<span class='badge b-green'>사업보고서</span>" if mode == "business" else "<span class='badge b-yellow'>감사보고서</span>"
-    listing    = "<span class='badge b-blue'>상장 📈</span>" if params.get("stock_code") else "<span class='badge b-gray'>비상장 🏢</span>"
-    std        = "K-IFRS 연결" if fs_div == "CFS" else "K-GAAP 개별"
-
-    st.markdown(f"<div class='page-title'>{name}</div>", unsafe_allow_html=True)
-    st.markdown(listing + mode_badge +
-                f"<span class='badge b-teal'>{std}</span>"
-                f"<span class='badge b-gray'>{min(years)}~{max(years)}</span>",
-                unsafe_allow_html=True)
-
-    src_txt = " · ".join([f"{y}: {sources.get(y,'—')}" for y in years])
-    st.markdown(f"<p style='font-size:.65rem;color:#9CA3AF;margin:4px 0 0;'>조회 소스: {src_txt}</p>",
-                unsafe_allow_html=True)
-    st.markdown("<div style='height:.7rem'></div>", unsafe_allow_html=True)
-
-    # ══ 신규: 기업 개요 + 주주구성 + 뉴스 ══
-    corp_info   = get_company_info(key, params["corp_code"])
-    shareholders = get_shareholders(key, params["corp_code"])
-    news_list   = get_news(name)
-    perf_data   = build_perf_summary(kmap, years, name)
-
-    # ── Row: 사업 요약 | 주주구성 | 뉴스 ──
-    col_biz, col_share, col_news = st.columns([2.2, 1.6, 2.2])
-
-    with col_biz:
-        st.markdown("<div class='sec'>사업 개요</div>", unsafe_allow_html=True)
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-
-        # DART 기업개황 정보
-        ind  = corp_info.get("induty_code_nm", corp_info.get("induty_cd", ""))
-        biz  = corp_info.get("bizr_no", "")
-        est  = corp_info.get("est_dt", "")
-        emp  = corp_info.get("emp_no", "")
-        addr = corp_info.get("adres", "")
-        hp   = corp_info.get("hm_url", "")
-        ceo  = corp_info.get("ceo_nm", "")
-
-        # 업종 태그
-        tags_html = ""
-        if ind:
-            for tag in ind.split("/")[:3]:
-                tags_html += f"<span class='biz-tag'>{tag.strip()}</span>"
-
-        info_rows = ""
-        for label, val in [("대표이사", ceo), ("설립일", est[:4]+"년 "+est[4:6]+"월" if est and len(est)>=6 else est),
-                           ("임직원", f"{int(emp):,}명" if emp and str(emp).isdigit() else emp),
-                           ("소재지", addr[:20]+"…" if len(addr)>20 else addr)]:
-            if val:
-                info_rows += (f"<div style='display:flex;gap:.5rem;padding:.25rem 0;border-bottom:1px solid #F3F4F6;'>"
-                              f"<span style='font-size:.7rem;color:#9CA3AF;width:60px;flex-shrink:0;'>{label}</span>"
-                              f"<span style='font-size:.75rem;color:#374151;font-weight:500;'>{val}</span></div>")
-
-        hp_html = f"<a href='{hp}' target='_blank' style='font-size:.7rem;color:#3B82F6;'>🔗 홈페이지</a>" if hp else ""
-
         st.markdown(
-            f"<div class='biz-box'>{tags_html}</div>"
-            f"<div style='margin-top:.7rem;'>{info_rows}</div>"
-            f"<div style='margin-top:.6rem;'>{hp_html}</div>",
+            "<div style='max-width:520px;margin:4rem auto;background:white;border-radius:16px;"
+            "padding:2.5rem 2rem;box-shadow:0 4px 20px rgba(0,0,0,0.08);text-align:center;'>"
+            "<div style='font-size:2.5rem;margin-bottom:1rem;'>🏢</div>"
+            "<div style='font-size:1.15rem;font-weight:700;color:#111827;margin-bottom:.6rem;'>"
+            "비상장사는 지원하지 않습니다</div>"
+            "<div style='font-size:.88rem;color:#6B7280;line-height:1.7;margin-bottom:1.5rem;'>"
+            + name + "은(는) 비상장 법인입니다.<br>코스피·코스닥 상장사만 지원합니다.</div>"
+            "<div style='background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;"
+            "padding:1rem 1.2rem;font-size:.82rem;color:#0369A1;'>💡 상장사 예시:<br>"
+            "삼성전자 · SK하이닉스 · 카카오 · NAVER</div></div>",
             unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_share:
-        st.markdown("<div class='sec'>주주 구성</div>", unsafe_allow_html=True)
-        st.markdown("<div class='card' style='padding:.8rem;'>", unsafe_allow_html=True)
-        if shareholders:
-            fig_pie = build_shareholder_chart(shareholders)
-            if fig_pie:
-                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
-            # 주주 리스트
-            for s in shareholders[:5]:
-                nm  = s.get("nm", s.get("shrholdr_nm", "")).strip()
-                tot = s.get("trmend_tot_stock",""); pos = s.get("trmend_posesn_stock_co","")
-                try:
-                    pct = round(float(str(pos).replace(",","")) / float(str(tot).replace(",","")) * 100, 1)
-                    bar_w = int(pct)
-                    st.markdown(
-                        f"<div style='margin:.2rem 0;'>"
-                        f"<div style='display:flex;justify-content:space-between;font-size:.72rem;'>"
-                        f"<span style='color:#374151;font-weight:500;'>{nm[:12]}</span>"
-                        f"<span style='color:#1A3A6B;font-weight:700;'>{pct:.1f}%</span></div>"
-                        f"<div style='background:#EFF6FF;border-radius:4px;height:4px;margin-top:2px;'>"
-                        f"<div style='background:#1A3A6B;width:{min(bar_w,100)}%;height:4px;border-radius:4px;'></div></div>"
-                        f"</div>", unsafe_allow_html=True)
-                except: pass
-        else:
-            st.markdown("<div style='font-size:.8rem;color:#9CA3AF;text-align:center;padding:1rem;'>주주 정보 없음</div>",
-                        unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_news:
-        st.markdown("<div class='sec'>최신 뉴스</div>", unsafe_allow_html=True)
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        if news_list:
-            for news in news_list:
-                title  = news["title"].split(" - ")[0]  # 출처 제거
-                st.markdown(
-                    f"<div class='news-item'>"
-                    f"<div style='flex:1;'>"
-                    f"<div class='news-title'><a href='{news['link']}' target='_blank'>{title}</a></div>"
-                    f"<div style='display:flex;gap:.4rem;margin-top:3px;align-items:center;'>"
-                    f"<span class='news-date'>{news['date']}</span>"
-                    f"{'<span class="news-source">'+news["source"]+'</span>' if news['source'] else ''}"
-                    f"</div></div></div>",
-                    unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='font-size:.8rem;color:#9CA3AF;text-align:center;padding:1rem;'>뉴스를 불러올 수 없습니다</div>",
-                        unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── 전년 대비 실적 요약 ──
-    if perf_data and perf_data.get("items"):
-        st.markdown(f"<div class='sec'>{perf_data['prev']}→{perf_data['latest']} 실적 변화 요약</div>",
-                    unsafe_allow_html=True)
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        col_p1, col_p2 = st.columns([2, 1.5])
-
-        with col_p1:
-            # 헤더
-            st.markdown(
-                "<div style='display:flex;gap:.5rem;padding:.3rem .5rem;background:#F8FAFF;border-radius:6px;margin-bottom:4px;'>"
-                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;'>항목</span>"
-                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;text-align:right;'>최근 실적</span>"
-                "<span style='font-size:.68rem;color:#9CA3AF;width:90px;text-align:right;'>전년비 변화</span>"
-                "<span style='font-size:.68rem;color:#9CA3AF;width:60px;text-align:right;'>증감률</span>"
-                "</div>", unsafe_allow_html=True)
-            for item in perf_data["items"]:
-                clr = item["color"]
-                st.markdown(
-                    f"<div class='perf-row'>"
-                    f"<span class='perf-label'>{item['label']}</span>"
-                    f"<span class='perf-curr'>{item['curr']}</span>"
-                    f"<span class='perf-diff' style='color:{clr};'>{item['arrow']} {item['diff']}</span>"
-                    f"<span class='perf-pct'  style='color:{clr};'>{item['pct']}</span>"
-                    f"</div>", unsafe_allow_html=True)
-
-        with col_p2:
-            st.markdown("<div style='padding-left:.5rem;'>", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:.72rem;color:#6B7280;font-weight:600;margin-bottom:.5rem;'>주요 이슈</div>",
-                        unsafe_allow_html=True)
-            issues = perf_data.get("issues", [])
-            if issues:
-                for iss in issues:
-                    st.markdown(f"<div class='issue-item'>{iss}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='font-size:.78rem;color:#9CA3AF;'>특이사항 없음</div>",
-                            unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
+        return
 
     # KPI Row 1
     st.markdown("<div class='sec'>핵심 손익 지표</div>", unsafe_allow_html=True)
