@@ -256,6 +256,8 @@ def get_news(company_name, n=5):
                 date_str = pub[:10] if pub else ""
             news.append({"title": title, "link": link,
                          "date": date_str, "source": source})
+        # 날짜 기준 내림차순 (최신 기사 위로)
+        news.sort(key=lambda x: x["date"], reverse=True)
         return news
     except:
         return []
@@ -736,9 +738,9 @@ def sidebar():
         # 헤더
         st.markdown("""
         <div style='padding:1.3rem 0 .9rem;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:1rem;'>
-            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>SK SQUARE</div>
-            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>투자분석<br>재무 대시보드</div>
-            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>DART OpenAPI</div>
+            <div style='font-size:.58rem;letter-spacing:.15em;color:#93B4D8;font-weight:700;margin-bottom:3px;'>DART OpenAPI</div>
+            <div style='font-size:.95rem;font-weight:700;color:#FFF;line-height:1.3;'>상장사 공시<br>재무 요약</div>
+            <div style='font-size:.65rem;color:#7B9EC4;margin-top:3px;'>코스피 · 코스닥 상장사</div>
         </div>""", unsafe_allow_html=True)
 
         if not key:
@@ -754,7 +756,7 @@ def sidebar():
         sel_years = sorted(sel_years)
 
         # ── 연결/개별 ──
-        fs_label = st.selectbox("", ["연결 우선 (CFS→OFS)", "개별 우선 (OFS→CFS)"],
+        fs_label = st.selectbox("", ["연결 감사보고서를 우선 검색 (CFS)", "개별 감사보고서를 우선 검색 (OFS)"],
                                 key="fs", label_visibility="collapsed")
         fs_div = "CFS" if "CFS" in fs_label else "OFS"
 
