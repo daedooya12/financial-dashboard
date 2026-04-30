@@ -165,6 +165,9 @@ html, body, [class*="css"], .stApp {
 .issue-item { font-size:.8rem; color:#374151; padding:.4rem .7rem;
               background:#F9FAFB; border-radius:6px; margin-bottom:4px;
               border-left:2px solid #D1D5DB; }
+
+/* 구분선 얇게 */
+hr { border:none !important; border-top:1px solid rgba(200,210,230,0.2) !important; margin:.4rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
